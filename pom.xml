@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.gabriel</groupId>
+    <artifactId>yt-audio-downloader</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <javafx.version>21.0.2</javafx.version>
+        <main.class>com.gabriel.ytaudio.App</main.class>
+        <!-- Default target for this machine (Linux/WSL). JavaFX's own POM only picks up an
+             override for its *transitive* graphics/base classifiers via a real -D system
+             property (see the "javafx.platform.custom" profile in org.openjfx:javafx's POM) —
+             a plain <properties> value here does not reach that resolution step. So to build
+             for another OS, pass it on the command line, e.g.:
+               mvn clean package -Djavafx.platform=win   (Windows)
+               mvn clean package -Djavafx.platform=mac   (macOS) -->
+        <javafx.platform>linux</javafx.platform>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>${javafx.platform}</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>${javafx.platform}</classifier>
+        </dependency>
+        <!-- WebView for the in-app Google login (reads real session cookies for yt-dlp).
+             javafx-web needs javafx-media as a module dependency; declared explicitly with
+             our own classifier for the same reason as controls/fxml above. -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-web</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>${javafx.platform}</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-media</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>${javafx.platform}</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.json</groupId>
+            <artifactId>json</artifactId>
+            <version>20240303</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+                <configuration>
+                    <mainClass>${main.class}</mainClass>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.1</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <!-- Entry point is Launcher, not App: java -jar refuses to start a
+                                 javafx.application.Application subclass directly without a
+                                 module-path, so a plain-class shim is required. -->
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>com.gabriel.ytaudio.Launcher</mainClass>
+                                </transformer>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <!-- Windows build bundles yt-dlp.exe/ffmpeg.exe/ffprobe.exe from native-bin/win as jar
+         resources, so the Windows jar needs nothing pre-installed besides a JRE. Only
+         activates for -Djavafx.platform=win; the default Linux/WSL build is unaffected. -->
+    <profiles>
+        <profile>
+            <id>bundle-windows-tools</id>
+            <activation>
+                <property>
+                    <name>javafx.platform</name>
+                    <value>win</value>
+                </property>
+            </activation>
+            <build>
+                <resources>
+                    <resource>
+                        <directory>src/main/resources</directory>
+                    </resource>
+                    <resource>
+                        <directory>native-bin/win</directory>
+                        <targetPath>native-bin/win</targetPath>
+                    </resource>
+                </resources>
+            </build>
+        </profile>
+    </profiles>
+</project>
