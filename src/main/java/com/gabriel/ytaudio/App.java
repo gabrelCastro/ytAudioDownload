@@ -1,19 +1,83 @@
 package com.gabriel.ytaudio;
 
+import com.gabriel.ytaudio.service.AppSettings;
+import com.gabriel.ytaudio.service.ToolLocator;
 import com.gabriel.ytaudio.ui.MainView;
 import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
+import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 
 public class App extends Application {
 
     @Override
     public void start(Stage primaryStage) {
+        Stage splash = buildSplash();
+        splash.show();
+
+        // Localizar (e, na build do Windows, extrair) yt-dlp/ffmpeg pode levar um tempo
+        // real na primeira execução — faz isso em background com a splash visível, em vez
+        // de deixar a janela principal travada/sem aparecer nesse meio tempo.
+        Thread warmup = new Thread(() -> {
+            try {
+                AppSettings settings = new AppSettings();
+                ToolLocator.locate(settings.getYtDlpPath(), "yt-dlp");
+                ToolLocator.locate(settings.getFfmpegPath(), "ffmpeg");
+            } catch (Exception ignored) {
+                // MainView refaz essa checagem normalmente; falhas aqui não são fatais.
+            }
+            Platform.runLater(() -> {
+                showMainWindow(primaryStage);
+                splash.close();
+            });
+        });
+        warmup.setDaemon(true);
+        warmup.start();
+    }
+
+    private Stage buildSplash() {
+        Stage splash = new Stage(StageStyle.TRANSPARENT);
+        splash.setAlwaysOnTop(true);
+
+        ImageView icon = new ImageView(new Image(getClass().getResourceAsStream("/icons/icon-128.png")));
+        icon.setFitWidth(72);
+        icon.setFitHeight(72);
+
+        Label title = new Label("YT Audio Downloader");
+        title.getStyleClass().add("app-title");
+
+        ProgressIndicator spinner = new ProgressIndicator();
+        spinner.setMaxSize(36, 36);
+
+        Label status = new Label("Carregando...");
+        status.getStyleClass().add("app-subtitle");
+
+        VBox box = new VBox(16, icon, title, spinner, status);
+        box.setAlignment(Pos.CENTER);
+        box.setPadding(new Insets(36));
+        box.getStyleClass().add("card");
+
+        Scene scene = new Scene(box, 320, 220, Color.TRANSPARENT);
+        scene.getStylesheets().add(getClass().getResource("/style.css").toExternalForm());
+        splash.setScene(scene);
+        splash.centerOnScreen();
+        return splash;
+    }
+
+    private void showMainWindow(Stage primaryStage) {
         MainView view = new MainView();
 
         ScrollPane scrollPane = new ScrollPane(view);
