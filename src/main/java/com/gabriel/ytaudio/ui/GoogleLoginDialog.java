@@ -2,13 +2,17 @@ package com.gabriel.ytaudio.ui;
 
 import com.gabriel.ytaudio.service.CookieExporter;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
 import javafx.scene.web.WebView;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -45,12 +49,24 @@ public class GoogleLoginDialog {
         WebView webView = new WebView();
         webView.getEngine().load("https://accounts.google.com/ServiceLogin?service=youtube&continue=https://www.youtube.com/");
 
+        ProgressIndicator loadingIndicator = new ProgressIndicator();
+        loadingIndicator.setMaxSize(48, 48);
+        webView.getEngine().getLoadWorker().runningProperty().addListener((obs, was, running) ->
+                loadingIndicator.setVisible(running));
+
+        StackPane webStack = new StackPane(webView, loadingIndicator);
+        StackPane.setAlignment(loadingIndicator, Pos.CENTER);
+
         Label hint = new Label("Faça login normalmente. Quando terminar (a página do YouTube carregar), clique em \"Concluí o login\".");
+        hint.getStyleClass().add("app-subtitle");
         hint.setWrapText(true);
-        hint.setMaxWidth(320);
+        hint.setMaxWidth(280);
+        HBox.setHgrow(hint, Priority.ALWAYS);
 
         Button doneButton = new Button("Concluí o login");
+        doneButton.getStyleClass().add("primary-button");
         Button cancelButton = new Button("Cancelar");
+        cancelButton.getStyleClass().add("secondary-button");
 
         doneButton.setOnAction(e -> {
             try {
@@ -68,13 +84,20 @@ public class GoogleLoginDialog {
         cancelButton.setOnAction(e -> stage.close());
 
         HBox bottom = new HBox(10, hint, cancelButton, doneButton);
-        bottom.setPadding(new Insets(10));
+        bottom.setAlignment(Pos.CENTER_LEFT);
+        bottom.setPadding(new Insets(14));
+        bottom.getStyleClass().add("card");
 
         BorderPane root = new BorderPane();
-        root.setCenter(webView);
+        root.getStyleClass().add("root");
+        root.setPadding(new Insets(12));
+        root.setCenter(webStack);
         root.setBottom(bottom);
+        BorderPane.setMargin(bottom, new Insets(12, 0, 0, 0));
 
-        stage.setScene(new Scene(root, 480, 680));
+        Scene scene = new Scene(root, 480, 700);
+        scene.getStylesheets().add(GoogleLoginDialog.class.getResource("/style.css").toExternalForm());
+        stage.setScene(scene);
         stage.showAndWait();
     }
 }

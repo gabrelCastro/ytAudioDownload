@@ -377,6 +377,11 @@
     -fx-border-color: -fx-border-strong;
     -fx-border-radius: 4;
     -fx-background-radius: 4;
+    -fx-cursor: hand;
+}
+
+.check-box:hover .box {
+    -fx-border-color: -fx-accent-color;
 }
 
 .check-box:selected .box {
@@ -386,6 +391,12 @@
 
 .check-box:selected .mark {
     -fx-background-color: #ffffff;
+}
+
+/* --------------------------------------------------------- keyboard focus */
+
+.button:focused, .link-button:focused {
+    -fx-effect: dropshadow(gaussian, rgba(109,123,250,0.55), 0, 1.0, 0, 0), dropshadow(gaussian, rgba(109,123,250,0.35), 10, 0, 0, 0);
 }
 
 /* ------------------------------------------------------------------- misc */

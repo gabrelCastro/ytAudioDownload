@@ -26,6 +26,7 @@ public class MainView extends BorderPane {
 
     private final AppSettings settings = new AppSettings();
     private final ObservableList<VideoItem> items = FXCollections.observableArrayList();
+    private final java.util.Map<String, javafx.scene.image.Image> thumbnailCache = new java.util.HashMap<>();
 
     private final TextArea urlField = new TextArea();
     private final Button fetchButton = new Button("Buscar");
@@ -88,7 +89,7 @@ public class MainView extends BorderPane {
         urlField.setPrefRowCount(3);
         HBox.setHgrow(urlField, Priority.ALWAYS);
         urlField.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, e -> {
-            if (e.getCode() == javafx.scene.input.KeyCode.ENTER && e.isShortcutDown()) {
+            if (e.getCode() == javafx.scene.input.KeyCode.ENTER && e.isShortcutDown() && !fetchButton.isDisabled()) {
                 onFetch();
                 e.consume();
             }
@@ -122,7 +123,7 @@ public class MainView extends BorderPane {
     private Node buildTable() {
         table.setItems(items);
         table.setEditable(true);
-        table.setFixedCellSize(54);
+        table.setFixedCellSize(62);
         table.setPrefHeight(620);
         table.setPlaceholder(new Label("Cole uma ou mais URLs acima (uma por linha) e clique em \"Buscar\" para listar os vídeos."));
         table.getStyleClass().add("video-table");
@@ -159,7 +160,8 @@ public class MainView extends BorderPane {
                 if (empty || url == null || url.isBlank()) {
                     setGraphic(null);
                 } else {
-                    imageView.setImage(new javafx.scene.image.Image(url, 84, 47, true, true, true));
+                    imageView.setImage(thumbnailCache.computeIfAbsent(url,
+                            u -> new javafx.scene.image.Image(u, 84, 47, true, true, true)));
                     setGraphic(imageView);
                 }
             }
@@ -222,6 +224,14 @@ public class MainView extends BorderPane {
         });
 
         table.getColumns().addAll(selectCol, thumbCol, titleCol, durationCol, progressCol, statusCol);
+        table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        titleCol.prefWidthProperty().bind(table.widthProperty()
+                .subtract(selectCol.widthProperty())
+                .subtract(thumbCol.widthProperty())
+                .subtract(durationCol.widthProperty())
+                .subtract(progressCol.widthProperty())
+                .subtract(statusCol.widthProperty())
+                .subtract(18));
         VBox.setVgrow(table, Priority.ALWAYS);
 
         VBox box = new VBox(16, buildSelectionRow(), table);
