@@ -32,6 +32,7 @@ public class MainView extends BorderPane {
 
     private final TextArea urlField = new TextArea();
     private final Button fetchButton = new Button("Buscar");
+    private final Button maximizeButton = new Button("Maximizar");
     private final Label engineStatusLabel = new Label();
 
     private final TableView<VideoItem> table = new TableView<>();
@@ -76,11 +77,10 @@ public class MainView extends BorderPane {
 
         VBox titleBox = new VBox(4, title, subtitle);
 
-        Button maximizeButton = new Button("Maximizar");
         maximizeButton.getStyleClass().add("secondary-button");
         maximizeButton.setOnAction(e -> {
             boolean nowMaximized = com.gabriel.ytaudio.App.toggleMaximized((Stage) getScene().getWindow());
-            maximizeButton.setText(nowMaximized ? "Restaurar" : "Maximizar");
+            setMaximizedButtonLabel(nowMaximized);
         });
 
         Button settingsButton = new Button("⚙  Configurações");
@@ -621,5 +621,9 @@ public class MainView extends BorderPane {
         if (downloadPool != null) {
             downloadPool.shutdownNow();
         }
+    }
+
+    public void setMaximizedButtonLabel(boolean maximized) {
+        maximizeButton.setText(maximized ? "Restaurar" : "Maximizar");
     }
 }

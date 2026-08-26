@@ -43,6 +43,7 @@ public class App extends Application {
         });
 
         primaryStage.show();
+        view.setMaximizedButtonLabel(toggleMaximized(primaryStage));
 
         primaryStage.setOnCloseRequest(e -> view.shutdown());
     }
