@@ -25,8 +25,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class MainView extends BorderPane {
 
     private final AppSettings settings = new AppSettings();
-    private final ObservableList<VideoItem> items = FXCollections.observableArrayList();
+    private final ObservableList<VideoItem> items =
+            FXCollections.observableArrayList(item -> new javafx.beans.Observable[]{item.selectedProperty()});
     private final java.util.Map<String, javafx.scene.image.Image> thumbnailCache = new java.util.HashMap<>();
+    private final javafx.beans.property.BooleanProperty downloading = new javafx.beans.property.SimpleBooleanProperty(false);
 
     private final TextArea urlField = new TextArea();
     private final Button fetchButton = new Button("Buscar");
@@ -246,7 +248,11 @@ public class MainView extends BorderPane {
 
         Label countLabel = new Label();
         countLabel.getStyleClass().add("app-subtitle");
-        countLabel.textProperty().bind(javafx.beans.binding.Bindings.size(items).asString("%d itens encontrados"));
+        countLabel.textProperty().bind(javafx.beans.binding.Bindings.createStringBinding(() -> {
+            long selectedCount = items.stream().filter(VideoItem::isSelected).count();
+            return items.size() + " itens encontrados"
+                    + (items.isEmpty() ? "" : " · " + selectedCount + " selecionado(s)");
+        }, items));
 
         Button selectAll = new Button("Selecionar todos");
         selectAll.getStyleClass().add("link-button");
@@ -287,6 +293,9 @@ public class MainView extends BorderPane {
         downloadButton.setText("⬇  Baixar selecionados");
         downloadButton.getStyleClass().add("primary-button");
         downloadButton.setOnAction(e -> onDownload());
+        javafx.beans.binding.BooleanBinding noneSelected = javafx.beans.binding.Bindings.createBooleanBinding(
+                () -> items.stream().noneMatch(VideoItem::isSelected), items);
+        downloadButton.disableProperty().bind(downloading.or(noneSelected));
 
         overallProgress.setPrefWidth(220);
         overallLabel.getStyleClass().add("app-subtitle");
@@ -417,7 +426,7 @@ public class MainView extends BorderPane {
         String format = formatCombo.getValue();
         String bitrate = bitrateCombo.getValue();
 
-        downloadButton.setDisable(true);
+        downloading.set(true);
         overallProgress.setProgress(0);
         AtomicInteger completed = new AtomicInteger(0);
         int total = selected.size();
@@ -443,7 +452,7 @@ public class MainView extends BorderPane {
                         overallLabel.setText("Baixando " + done + "/" + total + "...");
                         if (done == total) {
                             overallLabel.setText("Concluído: " + total + " item(ns).");
-                            downloadButton.setDisable(false);
+                            downloading.set(false);
                         }
                     });
                 }
