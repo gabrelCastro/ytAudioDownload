@@ -58,8 +58,10 @@ static BOOL runLogged(wchar_t *cmdLine, BOOL wait) {
     STARTUPINFOW si;
     ZeroMemory(&si, sizeof(si));
     si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESHOWWINDOW;
-    si.wShowWindow = SW_HIDE;
+    // CREATE_NO_WINDOW below is what actually suppresses the console — deliberately not
+    // also setting STARTF_USESHOWWINDOW/SW_HIDE here, since some JDK builds query the
+    // inherited show-state during AWT/window-toolkit init and a "hidden" hint can make
+    // that init path behave unexpectedly.
     if (hLog != INVALID_HANDLE_VALUE) {
         si.dwFlags |= STARTF_USESTDHANDLES;
         si.hStdOutput = hLog;
