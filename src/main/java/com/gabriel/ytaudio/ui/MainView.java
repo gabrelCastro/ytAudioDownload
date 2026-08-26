@@ -225,6 +225,25 @@ public class MainView extends BorderPane {
             }
         });
 
+        table.setRowFactory(tv -> {
+            TableRow<VideoItem> row = new TableRow<>();
+            MenuItem openItem = new MenuItem("Abrir no navegador");
+            openItem.setOnAction(e -> openInBrowser(row.getItem()));
+            MenuItem copyItem = new MenuItem("Copiar link");
+            copyItem.setOnAction(e -> copyLink(row.getItem()));
+            ContextMenu menu = new ContextMenu(openItem, copyItem);
+            row.contextMenuProperty().bind(
+                    javafx.beans.binding.Bindings.when(row.emptyProperty())
+                            .then((ContextMenu) null)
+                            .otherwise(menu));
+            row.setOnMouseClicked(event -> {
+                if (event.getClickCount() == 2 && !row.isEmpty()) {
+                    openInBrowser(row.getItem());
+                }
+            });
+            return row;
+        });
+
         table.getColumns().addAll(selectCol, thumbCol, titleCol, durationCol, progressCol, statusCol);
         table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
         titleCol.prefWidthProperty().bind(table.widthProperty()
@@ -458,6 +477,26 @@ public class MainView extends BorderPane {
                 }
             });
         }
+    }
+
+    private void openInBrowser(VideoItem item) {
+        if (item == null || item.getUrl() == null || item.getUrl().isBlank()) {
+            return;
+        }
+        try {
+            java.awt.Desktop.getDesktop().browse(java.net.URI.create(item.getUrl()));
+        } catch (Exception ex) {
+            showAlert(Alert.AlertType.WARNING, "Não foi possível abrir o navegador: " + ex.getMessage());
+        }
+    }
+
+    private void copyLink(VideoItem item) {
+        if (item == null || item.getUrl() == null) {
+            return;
+        }
+        javafx.scene.input.ClipboardContent content = new javafx.scene.input.ClipboardContent();
+        content.putString(item.getUrl());
+        javafx.scene.input.Clipboard.getSystemClipboard().setContent(content);
     }
 
     private void chooseOutputDir() {

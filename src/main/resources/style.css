@@ -223,6 +223,7 @@
 
 .video-table .table-row-cell:hover {
     -fx-background-color: -fx-bg-surface-3;
+    -fx-cursor: hand;
 }
 
 .video-table .table-row-cell:selected {
