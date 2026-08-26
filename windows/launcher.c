@@ -9,6 +9,11 @@
 // Being a GUI-subsystem binary (linked with -mwindows), this never allocates a console
 // window on its own, unlike the earlier .bat-based launcher (any .bat double-clicked
 // from Explorer briefly flashes a cmd.exe console before it can hide anything).
+//
+// Runs plain "java" (not "javaw") with CREATE_NO_WINDOW: java.exe's stdout/stderr can be
+// reliably redirected to a log file this way, so a JVM startup crash is diagnosable from
+// %LOCALAPPDATA%\yt-audio-downloader\launcher.log instead of vanishing silently the way
+// it would with javaw.
 #include <windows.h>
 #include <stdio.h>
 
@@ -17,16 +22,56 @@ static BOOL fileExists(const wchar_t *path) {
     return attrib != INVALID_FILE_ATTRIBUTES && !(attrib & FILE_ATTRIBUTE_DIRECTORY);
 }
 
-static BOOL runProcess(wchar_t *cmdLine, BOOL wait) {
+static void getAppDataDir(wchar_t *out, size_t outSize) {
+    wchar_t localAppData[MAX_PATH] = L"";
+    GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, MAX_PATH);
+    _snwprintf(out, outSize, L"%s\\yt-audio-downloader", localAppData);
+}
+
+static void getPortableJrePath(wchar_t *out, size_t outSize) {
+    wchar_t appDir[MAX_PATH];
+    getAppDataDir(appDir, MAX_PATH);
+    _snwprintf(out, outSize, L"%s\\jre\\bin\\java.exe", appDir);
+}
+
+static void getLogPath(wchar_t *out, size_t outSize) {
+    wchar_t appDir[MAX_PATH];
+    getAppDataDir(appDir, MAX_PATH);
+    CreateDirectoryW(appDir, NULL);
+    _snwprintf(out, outSize, L"%s\\launcher.log", appDir);
+}
+
+// Runs a command line with its console suppressed (CREATE_NO_WINDOW) but stdout/stderr
+// redirected to the log file, so startup crashes are diagnosable without ever showing a
+// console window to the user.
+static BOOL runLogged(wchar_t *cmdLine, BOOL wait) {
+    wchar_t logPath[MAX_PATH];
+    getLogPath(logPath, MAX_PATH);
+
+    SECURITY_ATTRIBUTES sa;
+    ZeroMemory(&sa, sizeof(sa));
+    sa.nLength = sizeof(sa);
+    sa.bInheritHandle = TRUE;
+    HANDLE hLog = CreateFileW(logPath, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                              &sa, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
     STARTUPINFOW si;
-    PROCESS_INFORMATION pi;
     ZeroMemory(&si, sizeof(si));
     si.cb = sizeof(si);
     si.dwFlags = STARTF_USESHOWWINDOW;
     si.wShowWindow = SW_HIDE;
-    ZeroMemory(&pi, sizeof(pi));
+    if (hLog != INVALID_HANDLE_VALUE) {
+        si.dwFlags |= STARTF_USESTDHANDLES;
+        si.hStdOutput = hLog;
+        si.hStdError = hLog;
+    }
 
-    BOOL ok = CreateProcessW(NULL, cmdLine, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&pi, sizeof(pi));
+    BOOL ok = CreateProcessW(NULL, cmdLine, NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+    if (hLog != INVALID_HANDLE_VALUE) {
+        CloseHandle(hLog);
+    }
     if (!ok) {
         return FALSE;
     }
@@ -36,12 +81,6 @@ static BOOL runProcess(wchar_t *cmdLine, BOOL wait) {
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
     return TRUE;
-}
-
-static void getPortableJrePath(wchar_t *out, size_t outSize) {
-    wchar_t localAppData[MAX_PATH] = L"";
-    GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, MAX_PATH);
-    _snwprintf(out, outSize, L"%s\\yt-audio-downloader\\jre\\bin\\javaw.exe", localAppData);
 }
 
 // Same Adoptium-download-and-extract logic as the previous bat-header.bat, just run
@@ -58,8 +97,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
     // 1) System Java on PATH.
     _snwprintf(cmd, sizeof(cmd) / sizeof(wchar_t),
-               L"javaw -Dprism.lcdtext=false -jar \"%s\"", selfPath);
-    if (runProcess(cmd, FALSE)) {
+               L"java -Dprism.lcdtext=false -jar \"%s\"", selfPath);
+    if (runLogged(cmd, FALSE)) {
         return 0;
     }
 
@@ -69,7 +108,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     if (fileExists(jrePath)) {
         _snwprintf(cmd, sizeof(cmd) / sizeof(wchar_t),
                    L"\"%s\" -Dprism.lcdtext=false -jar \"%s\"", jrePath, selfPath);
-        runProcess(cmd, FALSE);
+        runLogged(cmd, FALSE);
         return 0;
     }
 
@@ -78,12 +117,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
     _snwprintf(psCmd, sizeof(psCmd) / sizeof(wchar_t),
                L"powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand %s",
                BOOTSTRAP_PS_BASE64);
-    runProcess(psCmd, TRUE);
+    runLogged(psCmd, TRUE);
 
     if (fileExists(jrePath)) {
         _snwprintf(cmd, sizeof(cmd) / sizeof(wchar_t),
                    L"\"%s\" -Dprism.lcdtext=false -jar \"%s\"", jrePath, selfPath);
-        runProcess(cmd, FALSE);
+        runLogged(cmd, FALSE);
     } else {
         MessageBoxW(NULL,
                      L"Falha ao preparar o Java automaticamente. Instale manualmente em: https://adoptium.net",
