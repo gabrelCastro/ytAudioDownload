@@ -13,7 +13,8 @@ command -v x86_64-w64-mingw32-gcc >/dev/null || {
     exit 1
 }
 
-x86_64-w64-mingw32-gcc -municode -mwindows -O2 -o windows/launcher.exe windows/launcher.c
+x86_64-w64-mingw32-windres windows/launcher.rc -O coff -o windows/launcher_res.o
+x86_64-w64-mingw32-gcc -municode -mwindows -O2 -o windows/launcher.exe windows/launcher.c windows/launcher_res.o
 
 mvn clean package -Djavafx.platform=win
 cat windows/launcher.exe target/yt-audio-downloader-1.0.0.jar > YT-Audio-Downloader.exe
