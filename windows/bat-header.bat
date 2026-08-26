@@ -8,12 +8,12 @@ REM javaw (em vez de java) roda sem abrir uma janela de console, e "start" solta
 REM o processo para que este .bat encerre e feche a janela imediatamente.
 where javaw >nul 2>nul
 if %ERRORLEVEL%==0 (
-    start "" javaw -jar "%SELF%"
+    start "" javaw -Dprism.lcdtext=false -jar "%SELF%"
     goto :eof
 )
 
 if exist "%JAVA_EXE%" (
-    start "" "%JAVA_EXE%" -jar "%SELF%"
+    start "" "%JAVA_EXE%" -Dprism.lcdtext=false -jar "%SELF%"
     goto :eof
 )
 
@@ -27,5 +27,5 @@ if not exist "%JAVA_EXE%" (
     exit /b 1
 )
 
-start "" "%JAVA_EXE%" -jar "%SELF%"
+start "" "%JAVA_EXE%" -Dprism.lcdtext=false -jar "%SELF%"
 goto :eof

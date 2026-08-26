@@ -68,6 +68,9 @@
                 <version>0.0.8</version>
                 <configuration>
                     <mainClass>${main.class}</mainClass>
+                    <options>
+                        <option>-Dprism.lcdtext=false</option>
+                    </options>
                 </configuration>
             </plugin>
             <plugin>

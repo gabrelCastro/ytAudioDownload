@@ -13,6 +13,8 @@ import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.CheckBoxTableCell;
 import javafx.scene.layout.*;
+import javafx.scene.web.WebEngine;
+import javafx.scene.web.WebView;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
 
@@ -54,13 +56,15 @@ public class MainView extends BorderPane {
         setPadding(new Insets(24));
 
         Node header = buildHeader();
+        Node browserPanel = buildBrowserPanel();
         Node table = buildTable();
         Node footer = buildFooter();
 
-        BorderPane.setMargin(header, new Insets(0, 0, 20, 0));
+        VBox topSection = new VBox(20, header, browserPanel);
+        BorderPane.setMargin(topSection, new Insets(0, 0, 20, 0));
         BorderPane.setMargin(table, new Insets(0, 0, 20, 0));
 
-        setTop(header);
+        setTop(topSection);
         setCenter(table);
         setBottom(footer);
         refreshEngineStatus();
@@ -124,6 +128,117 @@ public class MainView extends BorderPane {
         header.getStyleClass().add("card");
         header.setPadding(new Insets(22));
         return header;
+    }
+
+    // ---------------------------------------------------------------- browser
+
+    private static final java.util.regex.Pattern WATCH_ID_PATTERN = java.util.regex.Pattern.compile(
+            "(?i)(?:youtube\\.com/watch\\?(?:[^#]*&)?v=|youtu\\.be/|youtube\\.com/shorts/)([\\w-]{6,})");
+
+    private Node buildBrowserPanel() {
+        TitledPane pane = new TitledPane("Navegar no YouTube", null);
+        pane.setExpanded(false);
+        pane.getStyleClass().add("log-pane");
+        pane.expandedProperty().addListener((obs, was, expanded) -> {
+            if (expanded) {
+                pane.setContent(buildBrowserContent());
+            } else {
+                // Descarta a WebView ao recolher: sem isso, a página do YouTube (JS, timers,
+                // rede) continua rodando em segundo plano mesmo com o painel fechado.
+                pane.setContent(null);
+            }
+        });
+        return pane;
+    }
+
+    private static final String NO_ANIMATIONS_CSS =
+            "data:text/css," + java.net.URLEncoder.encode(
+                    "*, *::before, *::after { transition: none !important; animation: none !important; "
+                            + "scroll-behavior: auto !important; }",
+                    java.nio.charset.StandardCharsets.UTF_8);
+
+    private Node buildBrowserContent() {
+        WebView webView = new WebView();
+        webView.setPrefHeight(480);
+        webView.setContextMenuEnabled(false);
+        WebEngine engine = webView.getEngine();
+        // Página mobile é bem mais leve que a versão desktop (sem preview de vídeo em
+        // hover, sem tantas animações), e a folha de estilo abaixo corta o resto das
+        // transições/animações que sobram — reduz bastante o custo de repaint por frame.
+        engine.setUserStyleSheetLocation(NO_ANIMATIONS_CSS);
+        engine.load("https://m.youtube.com");
+
+        Button homeButton = new Button("YouTube");
+        homeButton.getStyleClass().add("secondary-button");
+        homeButton.setOnAction(e -> engine.load("https://m.youtube.com"));
+
+        Label statusLabel = new Label("Navegue até um vídeo para adicioná-lo à lista.");
+        statusLabel.getStyleClass().add("app-subtitle");
+        statusLabel.setWrapText(true);
+        HBox.setHgrow(statusLabel, Priority.ALWAYS);
+
+        Button addVideoButton = new Button("+  Adicionar vídeo");
+        addVideoButton.getStyleClass().add("primary-button");
+        addVideoButton.setDisable(true);
+
+        String[] currentVideoId = new String[1];
+
+        engine.locationProperty().addListener((obs, oldLoc, newLoc) -> {
+            java.util.regex.Matcher matcher = newLoc == null ? null : WATCH_ID_PATTERN.matcher(newLoc);
+            if (matcher != null && matcher.find()) {
+                currentVideoId[0] = matcher.group(1);
+                addVideoButton.setDisable(false);
+                statusLabel.setText("Pronto para adicionar este vídeo.");
+            } else {
+                currentVideoId[0] = null;
+                addVideoButton.setDisable(true);
+                statusLabel.setText("Navegue até um vídeo para adicioná-lo à lista.");
+            }
+        });
+
+        addVideoButton.setOnAction(e -> {
+            String videoId = currentVideoId[0];
+            if (videoId == null) {
+                return;
+            }
+            String url = "https://www.youtube.com/watch?v=" + videoId;
+            addVideoButton.setDisable(true);
+            statusLabel.setText("Adicionando...");
+            Thread thread = new Thread(() -> {
+                try {
+                    List<VideoItem> found = ytDlpService.fetchEntries(url);
+                    Platform.runLater(() -> {
+                        boolean addedAny = false;
+                        for (VideoItem candidate : found) {
+                            boolean duplicate = items.stream()
+                                    .anyMatch(i -> java.util.Objects.equals(i.getId(), candidate.getId()));
+                            if (!duplicate) {
+                                items.add(candidate);
+                                addedAny = true;
+                            }
+                        }
+                        statusLabel.setText(addedAny ? "Adicionado à lista." : "Esse vídeo já estava na lista.");
+                        addVideoButton.setDisable(currentVideoId[0] == null);
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        statusLabel.setText("Erro ao adicionar: " + ex.getMessage());
+                        addVideoButton.setDisable(currentVideoId[0] == null);
+                    });
+                }
+            });
+            thread.setDaemon(true);
+            thread.start();
+        });
+
+        HBox toolbar = new HBox(10, homeButton, statusLabel, addVideoButton);
+        toolbar.setAlignment(Pos.CENTER_LEFT);
+        toolbar.setPadding(new Insets(0, 4, 10, 4));
+
+        BorderPane root = new BorderPane();
+        root.setTop(toolbar);
+        root.setCenter(webView);
+        return root;
     }
 
     // ----------------------------------------------------------------- table
