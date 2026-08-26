@@ -2,16 +2,18 @@
 setlocal
 set "SELF=%~f0"
 set "LOCAL_JRE=%LOCALAPPDATA%\yt-audio-downloader\jre"
-set "JAVA_EXE=%LOCAL_JRE%\bin\java.exe"
+set "JAVA_EXE=%LOCAL_JRE%\bin\javaw.exe"
 
-where java >nul 2>nul
+REM javaw (em vez de java) roda sem abrir uma janela de console, e "start" solta
+REM o processo para que este .bat encerre e feche a janela imediatamente.
+where javaw >nul 2>nul
 if %ERRORLEVEL%==0 (
-    java -jar "%SELF%"
+    start "" javaw -jar "%SELF%"
     goto :eof
 )
 
 if exist "%JAVA_EXE%" (
-    "%JAVA_EXE%" -jar "%SELF%"
+    start "" "%JAVA_EXE%" -jar "%SELF%"
     goto :eof
 )
 
@@ -25,5 +27,5 @@ if not exist "%JAVA_EXE%" (
     exit /b 1
 )
 
-"%JAVA_EXE%" -jar "%SELF%"
+start "" "%JAVA_EXE%" -jar "%SELF%"
 goto :eof

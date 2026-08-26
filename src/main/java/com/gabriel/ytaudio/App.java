@@ -5,6 +5,7 @@ import javafx.application.Application;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
@@ -24,6 +25,9 @@ public class App extends Application {
         scene.getStylesheets().add(getClass().getResource("/style.css").toExternalForm());
 
         primaryStage.setTitle("YT Audio Downloader");
+        for (String size : new String[]{"256", "128", "64", "48", "32", "16"}) {
+            primaryStage.getIcons().add(new Image(getClass().getResourceAsStream("/icons/icon-" + size + ".png")));
+        }
         primaryStage.setScene(scene);
         primaryStage.setMinWidth(900);
         primaryStage.setMinHeight(620);
