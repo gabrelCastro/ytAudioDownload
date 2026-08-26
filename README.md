@@ -14,8 +14,9 @@ YouTube já convertidos em áudio (MP3, M4A, Opus, FLAC ou WAV). Uso pessoal, lo
 - Escolha de pasta de saída, formato de áudio e qualidade.
 - Autenticação por cookies para vídeos que exigem login (idade, "sign in to
   confirm you're not a bot"), incluindo um **login com Google embutido no app**.
-- Build de **arquivo único para Windows**: um `.bat` que já é o próprio jar
-  (com yt-dlp/ffmpeg embutidos), sem precisar instalar nada além do Java.
+- Build de **arquivo único para Windows**: um `.exe` nativo (sem console, sem flash
+  de terminal) que já é o próprio jar (com yt-dlp/ffmpeg embutidos), sem precisar
+  instalar nada além do Java.
 
 ## Como funciona
 
@@ -127,28 +128,35 @@ Esse jar sozinho já roda em qualquer Windows com Java instalado
 (`java -jar target/yt-audio-downloader-1.0.0.jar`). Mas o projeto vai além:
 `windows/build-single-file.sh` embute também `yt-dlp.exe`, `ffmpeg.exe` e
 `ffprobe.exe` dentro do próprio jar (extraídos automaticamente na primeira
-execução) e gera um único arquivo `.bat` que **é o próprio jar** — um "polyglot"
-que roda tanto como script batch (duplo-clique) quanto como jar (`java -jar`),
-técnica igual à dos jars "fully executable" do Spring Boot: um cabeçalho de
-script pode ser concatenado antes dos bytes de um zip sem quebrá-lo, porque
-`java.util.zip` localiza o *central directory* a partir do fim do arquivo,
-tolerando qualquer prefixo.
+execução) e gera um único arquivo `.exe` que **é o próprio jar** — um
+"polyglot" que roda tanto como executável nativo do Windows (duplo-clique)
+quanto como jar (`java -jar`), técnica igual à dos jars "fully executable" do
+Spring Boot: dados podem ser concatenados antes ou depois dos bytes de um zip
+sem quebrá-lo, porque `java.util.zip` localiza o *central directory* a partir
+do fim do arquivo, tolerando qualquer prefixo — e o carregador de PE do
+Windows, simetricamente, só lê os cabeçalhos do início do arquivo, ignorando
+o que vem depois. O executável em si (`windows/launcher.c`, compilado com
+`mingw-w64`) é um stub nativo mínimo que localiza o Java (do sistema ou um
+portátil já baixado) e o inicia com `-jar` apontando pra si mesmo — por ser
+um `.exe` de verdade (subsistema GUI, sem console), abrir não pisca nenhuma
+janela de terminal, ao contrário de um `.bat`.
 
 Para gerar:
 
 1. Baixe os três binários do Windows (não ficam no git — veja
    `native-bin/win/README.md` para os links) e coloque em `native-bin/win/`.
-2. Rode:
+2. Instale o compilador cruzado (uma vez só): `sudo apt-get install -y mingw-w64`.
+3. Rode:
    ```bash
    ./windows/build-single-file.sh
    ```
-3. Isso gera `YT-Audio-Downloader.bat` na raiz do projeto — copie esse único
+4. Isso gera `YT-Audio-Downloader.exe` na raiz do projeto — copie esse único
    arquivo para o Windows. Ele detecta se há Java instalado; se não houver,
    baixa e instala um Java portátil sozinho (Eclipse Temurin 21) na primeira
    execução, sem precisar de instalação manual.
 
 No Windows, ainda é necessário ter o próprio **Java** instalado (ou deixar o
-`.bat` baixar um Java portátil na primeira vez) — isso não dá para embutir da
+`.exe` baixar um Java portátil na primeira vez) — isso não dá para embutir da
 mesma forma que yt-dlp/ffmpeg.
 
 ## Solução de problemas
@@ -184,8 +192,8 @@ src/main/java/com/gabriel/ytaudio/
     └── GoogleLoginDialog.java    # login com Google via WebView
 
 windows/
-├── bat-header.bat                # cabeçalho batch usado no build single-file
-└── build-single-file.sh          # gera o YT-Audio-Downloader.bat
+├── launcher.c                    # stub nativo (sem console) usado no build single-file
+└── build-single-file.sh          # compila o launcher e gera o YT-Audio-Downloader.exe
 
 native-bin/win/                   # binários Windows (gitignored, ver README lá dentro)
 ```
