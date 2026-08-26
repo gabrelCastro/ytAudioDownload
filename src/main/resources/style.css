@@ -369,6 +369,26 @@
     -fx-background-color: -fx-bg-surface-3;
 }
 
+.recommended-list, .recommended-list .viewport {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+
+.recommended-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: -fx-text-main;
+    -fx-padding: 8 6;
+    -fx-border-color: transparent transparent -fx-border-soft transparent;
+}
+
+.recommended-list .list-cell:filled:hover {
+    -fx-background-color: -fx-bg-surface-2;
+}
+
+.recommended-list .list-cell:filled:selected {
+    -fx-background-color: -fx-bg-surface-2;
+}
+
 .spinner .increment-arrow-button, .spinner .decrement-arrow-button {
     -fx-background-color: transparent;
 }

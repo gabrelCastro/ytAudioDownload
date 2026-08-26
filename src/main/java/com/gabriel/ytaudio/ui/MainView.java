@@ -39,6 +39,9 @@ public class MainView extends BorderPane {
     private javafx.animation.Timeline clipboardWatcher;
     private String lastClipboardText = "";
 
+    private final ObservableList<VideoItem> recommendedItems = FXCollections.observableArrayList();
+    private final ListView<VideoItem> recommendedList = new ListView<>(recommendedItems);
+
     private final TableView<VideoItem> table = new TableView<>();
     private final Label outputDirLabel = new Label();
     private final ComboBox<String> formatCombo = new ComboBox<>();
@@ -58,13 +61,15 @@ public class MainView extends BorderPane {
         setPadding(new Insets(24));
 
         Node header = buildHeader();
+        Node recommendedPanel = buildRecommendedPanel();
         Node table = buildTable();
         Node footer = buildFooter();
 
-        BorderPane.setMargin(header, new Insets(0, 0, 20, 0));
+        VBox topSection = new VBox(20, header, recommendedPanel);
+        BorderPane.setMargin(topSection, new Insets(0, 0, 20, 0));
         BorderPane.setMargin(table, new Insets(0, 0, 20, 0));
 
-        setTop(header);
+        setTop(topSection);
         setCenter(table);
         setBottom(footer);
         refreshEngineStatus();
@@ -195,12 +200,13 @@ public class MainView extends BorderPane {
         if (!matcher.find()) {
             return;
         }
-        String url = "https://www.youtube.com/watch?v=" + matcher.group(1);
+        String videoId = matcher.group(1);
+        String url = "https://www.youtube.com/watch?v=" + videoId;
         clipboardStatusLabel.setText("Vídeo copiado detectado, adicionando...");
-        addVideoFromUrl(url);
+        addVideoFromUrl(url, videoId);
     }
 
-    private void addVideoFromUrl(String url) {
+    private void addVideoFromUrl(String url, String videoId) {
         Thread thread = new Thread(() -> {
             try {
                 List<VideoItem> found = ytDlpService.fetchEntries(url);
@@ -224,6 +230,102 @@ public class MainView extends BorderPane {
         });
         thread.setDaemon(true);
         thread.start();
+        fetchRecommendationsFor(videoId);
+    }
+
+    private void fetchRecommendationsFor(String videoId) {
+        Thread thread = new Thread(() -> {
+            try {
+                List<VideoItem> recommendations = ytDlpService.fetchRecommendations(videoId);
+                Platform.runLater(() -> recommendedItems.setAll(recommendations.stream().limit(10).toList()));
+            } catch (Exception ignored) {
+                // Recomendações são um extra opcional — falha aqui não deve incomodar o usuário.
+            }
+        });
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private Node buildRecommendedPanel() {
+        Label title = new Label("RECOMENDADOS");
+        title.getStyleClass().add("section-title");
+
+        Label subtitle = new Label("Baseado no último vídeo copiado — clique para adicionar");
+        subtitle.getStyleClass().add("app-subtitle");
+
+        Button addAllButton = new Button("Adicionar todos");
+        addAllButton.getStyleClass().add("link-button");
+        addAllButton.setOnAction(e -> {
+            for (VideoItem rec : List.copyOf(recommendedItems)) {
+                addRecommendedItem(rec);
+            }
+        });
+
+        Button hideButton = new Button("Ocultar");
+        hideButton.getStyleClass().add("link-button");
+        hideButton.setOnAction(e -> recommendedItems.clear());
+
+        HBox headerRow = new HBox(14, title, subtitle, spacer(), addAllButton, hideButton);
+        headerRow.setAlignment(Pos.CENTER_LEFT);
+
+        recommendedList.setFixedCellSize(58);
+        recommendedList.setPrefHeight(240);
+        recommendedList.getStyleClass().add("recommended-list");
+        recommendedList.setCellFactory(lv -> new ListCell<>() {
+            private final javafx.scene.image.ImageView imageView = new javafx.scene.image.ImageView();
+            private final Label titleLabel = new Label();
+            private final Label durationLabel = new Label();
+            private final Button addButton = new Button("+  Adicionar");
+            private final HBox box;
+            {
+                imageView.setFitWidth(64);
+                imageView.setFitHeight(36);
+                imageView.setPreserveRatio(true);
+                imageView.setSmooth(true);
+                titleLabel.getStyleClass().add("label");
+                durationLabel.getStyleClass().add("app-subtitle");
+                addButton.getStyleClass().add("secondary-button");
+                HBox.setHgrow(titleLabel, Priority.ALWAYS);
+                titleLabel.setMaxWidth(Double.MAX_VALUE);
+                box = new HBox(12, imageView, titleLabel, durationLabel, addButton);
+                box.setAlignment(Pos.CENTER_LEFT);
+            }
+
+            @Override
+            protected void updateItem(VideoItem item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setGraphic(null);
+                    return;
+                }
+                String thumbUrl = item.getThumbnailUrl();
+                if (thumbUrl != null && !thumbUrl.isBlank()) {
+                    imageView.setImage(thumbnailCache.computeIfAbsent(thumbUrl,
+                            u -> new javafx.scene.image.Image(u, 64, 36, true, true, true)));
+                } else {
+                    imageView.setImage(null);
+                }
+                titleLabel.setText(item.getTitle());
+                durationLabel.setText(item.getDuration());
+                addButton.setOnAction(e -> addRecommendedItem(item));
+                setGraphic(box);
+            }
+        });
+
+        VBox panel = new VBox(12, headerRow, recommendedList);
+        panel.getStyleClass().add("card");
+        panel.setPadding(new Insets(18));
+        panel.visibleProperty().bind(javafx.beans.binding.Bindings.isNotEmpty(recommendedItems));
+        panel.managedProperty().bind(panel.visibleProperty());
+        return panel;
+    }
+
+    private void addRecommendedItem(VideoItem rec) {
+        boolean duplicate = items.stream().anyMatch(i -> java.util.Objects.equals(i.getId(), rec.getId()));
+        if (!duplicate) {
+            items.add(rec);
+        }
+        recommendedItems.remove(rec);
     }
 
     // ----------------------------------------------------------------- table

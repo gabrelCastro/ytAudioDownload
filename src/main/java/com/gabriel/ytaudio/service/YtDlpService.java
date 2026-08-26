@@ -34,19 +34,40 @@ public class YtDlpService {
     /** Resolves a single video URL or a playlist URL into a list of downloadable items. */
     public List<VideoItem> fetchEntries(String url) throws IOException, InterruptedException {
         try {
-            return fetchEntries(url, false);
+            return fetchEntries(url, false, false);
         } catch (IOException firstError) {
             if (!hasCookiesConfigured()) {
                 throw firstError;
             }
-            return fetchEntries(url, true);
+            return fetchEntries(url, true, false);
         }
     }
 
-    private List<VideoItem> fetchEntries(String url, boolean useCookies) throws IOException, InterruptedException {
+    /** Returns YouTube's own "Mix" (auto-generated related-videos playlist) for a video,
+     *  excluding the seed video itself — used to suggest similar videos to add. */
+    public List<VideoItem> fetchRecommendations(String videoId) throws IOException, InterruptedException {
+        String url = "https://www.youtube.com/watch?v=" + videoId + "&list=RD" + videoId + "&start_radio=1";
+        List<VideoItem> entries;
+        try {
+            entries = fetchEntries(url, false, true);
+        } catch (IOException firstError) {
+            if (!hasCookiesConfigured()) {
+                throw firstError;
+            }
+            entries = fetchEntries(url, true, true);
+        }
+        return entries.stream().filter(item -> !videoId.equals(item.getId())).toList();
+    }
+
+    private List<VideoItem> fetchEntries(String url, boolean useCookies, boolean forcePlaylist)
+            throws IOException, InterruptedException {
         List<String> command = new ArrayList<>(List.of(
-                ytDlpPath, "-J", "--flat-playlist", "--no-warnings", "--ignore-errors", url
+                ytDlpPath, "-J", "--flat-playlist", "--no-warnings", "--ignore-errors"
         ));
+        if (forcePlaylist) {
+            command.add("--yes-playlist");
+        }
+        command.add(url);
         if (useCookies) {
             addCookiesOption(command);
         }
