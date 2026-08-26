@@ -68,7 +68,7 @@ public class MainView extends BorderPane {
     // ---------------------------------------------------------------- header
 
     private Node buildHeader() {
-        Label title = new Label("🎧  YT Audio Downloader");
+        Label title = new Label("YT Audio Downloader");
         title.getStyleClass().add("app-title");
 
         Label subtitle = new Label("Baixe vídeos ou playlists inteiras do YouTube já convertidos em áudio");
@@ -76,13 +76,20 @@ public class MainView extends BorderPane {
 
         VBox titleBox = new VBox(4, title, subtitle);
 
+        Button maximizeButton = new Button("Maximizar");
+        maximizeButton.getStyleClass().add("secondary-button");
+        maximizeButton.setOnAction(e -> {
+            boolean nowMaximized = com.gabriel.ytaudio.App.toggleMaximized((Stage) getScene().getWindow());
+            maximizeButton.setText(nowMaximized ? "Restaurar" : "Maximizar");
+        });
+
         Button settingsButton = new Button("⚙  Configurações");
         settingsButton.getStyleClass().add("secondary-button");
         settingsButton.setOnAction(e -> openSettingsDialog());
 
         engineStatusLabel.getStyleClass().add("engine-status");
 
-        HBox topRow = new HBox(14, titleBox, spacer(), engineStatusLabel, settingsButton);
+        HBox topRow = new HBox(14, titleBox, spacer(), engineStatusLabel, maximizeButton, settingsButton);
         topRow.setAlignment(Pos.CENTER_LEFT);
 
         urlField.setPromptText("Cole URLs (vídeos ou playlists) ou digite termos de busca — um por linha...");
@@ -97,7 +104,7 @@ public class MainView extends BorderPane {
             }
         });
 
-        fetchButton.setText("🔍  Buscar");
+        fetchButton.setText("Buscar");
         fetchButton.getStyleClass().add("primary-button");
         fetchButton.setOnAction(e -> onFetch());
         fetchButton.setMaxWidth(Double.MAX_VALUE);
