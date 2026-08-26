@@ -41,6 +41,8 @@ public class MainView extends BorderPane {
 
     private final ObservableList<VideoItem> recommendedItems = FXCollections.observableArrayList();
     private final ListView<VideoItem> recommendedList = new ListView<>(recommendedItems);
+    private final javafx.beans.property.BooleanProperty loadingRecommendations =
+            new javafx.beans.property.SimpleBooleanProperty(false);
 
     private final TableView<VideoItem> table = new TableView<>();
     private final Label outputDirLabel = new Label();
@@ -234,12 +236,17 @@ public class MainView extends BorderPane {
     }
 
     private void fetchRecommendationsFor(String videoId) {
+        recommendedItems.clear();
+        loadingRecommendations.set(true);
         Thread thread = new Thread(() -> {
             try {
                 List<VideoItem> recommendations = ytDlpService.fetchRecommendations(videoId);
-                Platform.runLater(() -> recommendedItems.setAll(recommendations.stream().limit(10).toList()));
-            } catch (Exception ignored) {
-                // Recomendações são um extra opcional — falha aqui não deve incomodar o usuário.
+                Platform.runLater(() -> {
+                    recommendedItems.setAll(recommendations.stream().limit(10).toList());
+                    loadingRecommendations.set(false);
+                });
+            } catch (Exception ex) {
+                Platform.runLater(() -> loadingRecommendations.set(false));
             }
         });
         thread.setDaemon(true);
@@ -271,6 +278,11 @@ public class MainView extends BorderPane {
         recommendedList.setFixedCellSize(58);
         recommendedList.setPrefHeight(240);
         recommendedList.getStyleClass().add("recommended-list");
+        Label loadingPlaceholder = new Label("Buscando recomendações...");
+        loadingPlaceholder.getStyleClass().add("app-subtitle");
+        Label emptyPlaceholder = new Label();
+        recommendedList.placeholderProperty().bind(javafx.beans.binding.Bindings.when(loadingRecommendations)
+                .then((Node) loadingPlaceholder).otherwise((Node) emptyPlaceholder));
         recommendedList.setCellFactory(lv -> new ListCell<>() {
             private final javafx.scene.image.ImageView imageView = new javafx.scene.image.ImageView();
             private final Label titleLabel = new Label();
@@ -315,7 +327,7 @@ public class MainView extends BorderPane {
         VBox panel = new VBox(12, headerRow, recommendedList);
         panel.getStyleClass().add("card");
         panel.setPadding(new Insets(18));
-        panel.visibleProperty().bind(javafx.beans.binding.Bindings.isNotEmpty(recommendedItems));
+        panel.visibleProperty().bind(javafx.beans.binding.Bindings.isNotEmpty(recommendedItems).or(loadingRecommendations));
         panel.managedProperty().bind(panel.visibleProperty());
         return panel;
     }
